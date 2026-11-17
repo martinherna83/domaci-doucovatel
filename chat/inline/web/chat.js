@@ -2,7 +2,6 @@
 
 const get = (id) => document.getElementById(id);
 const question = get("question");
-const code = get("code");
 const feed = get("messages");
 const feedback = get("feedback");
 const mic = get("mic");
@@ -14,6 +13,8 @@ let ready = false;
 let recorder;
 let recordingTimer;
 let reading;
+let quizActive = false;
+let stars = 0;
 
 function stopReading() {
   if (!reading) return;
@@ -69,30 +70,24 @@ function controls() {
   get("remove").disabled = busy;
   get("reset").disabled = busy || Boolean(recorder);
   mic.disabled = !ready || busy || !navigator.mediaDevices?.getUserMedia || typeof MediaRecorder !== "function";
-}
-
-function requireCode() {
-  if (code.value.trim()) return true;
-  get("access").open = true;
-  feedback.textContent = "Zadej rodinný kód od rodiče.";
-  code.focus();
-  return false;
+  get("quiz-tools").hidden = !history.length;
+  get("quiz").hidden = quizActive;
+  get("skip-quiz").hidden = !quizActive;
+  get("quiz").disabled = busy || Boolean(recorder);
+  get("skip-quiz").disabled = busy || Boolean(recorder);
+  question.placeholder = quizActive ? "Napiš odpověď na kvíz…" : "Napiš otázku…";
 }
 
 async function callApi(endpoint, payload) {
   const response = await fetch("./api/" + endpoint, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: "Bearer " + code.value.trim() },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(60000)
   });
   const result = await response.json();
-  if (response.status === 401) {
-    get("access").open = true;
-    code.focus();
-  }
   if (!response.ok) throw new Error(result.error || "Spojení se nepodařilo.");
-  return result.text;
+  return result;
 }
 
 function showError(error) {
@@ -134,12 +129,17 @@ function setAttachment(value) {
 get("reset").addEventListener("click", () => {
   stopReading();
   history.length = 0;
+  quizActive = false;
+  stars = 0;
+  get("stars").hidden = true;
+  get("stars").textContent = "";
   feed.replaceChildren();
   question.value = "";
   setAttachment("");
   feedback.textContent = "";
   get("welcome").hidden = false;
   get("reset").hidden = true;
+  controls();
   question.focus();
 });
 
@@ -182,12 +182,30 @@ get("photo").addEventListener("change", async ({ target }) => {
   }
 });
 
-get("compose").addEventListener("submit", async (event) => {
+get("compose").addEventListener("submit", (event) => {
   event.preventDefault();
-  if (!ready || busy || recorder || (!question.value.trim() && !image) || !requireCode()) return;
+  void sendMessage(quizActive ? "grade" : "chat");
+});
+get("quiz").addEventListener("click", () => { void sendMessage("quiz"); });
+get("skip-quiz").addEventListener("click", () => {
+  quizActive = false;
+  feedback.textContent = "Kvíz ukončen. Můžeš se dál ptát.";
+  controls();
+  question.focus();
+});
 
-  const draft = question.value;
-  const entry = { role: "user", text: draft.trim(), ...(image ? { image } : {}) };
+async function sendMessage(intent) {
+  const quizRequest = intent === "quiz";
+  if (!ready || busy || recorder || (!quizRequest && !question.value.trim() && !image)) return;
+  if (quizRequest && (question.value.trim() || image)) {
+    feedback.textContent = "Nejdřív odešli rozepsanou zprávu a pak zkus kvíz.";
+    return;
+  }
+  const entry = {
+    role: "user",
+    text: quizRequest ? "Chci zkusit krátký kvíz." : question.value.trim(),
+    ...(!quizRequest && image ? { image } : {})
+  };
   const prior = history.slice(-12);
   const lastPhoto = entry.image ? entry : prior.findLast((message) => message.image);
   // Pokračování zachová nejnovější fotku, aniž by každá žádost posílala všechny přílohy.
@@ -202,7 +220,7 @@ get("compose").addEventListener("submit", async (event) => {
   feedback.textContent = "Doučovatel připravuje odpověď…";
 
   try {
-    const text = await callApi("chat", { messages });
+    const { text, correct } = await callApi("chat", { messages, intent });
     history.push(entry, { role: "assistant", text });
     history.splice(0, Math.max(0, history.length - 12));
     for (const message of history) {
@@ -216,6 +234,17 @@ get("compose").addEventListener("submit", async (event) => {
     showMessage("assistant", text).scrollIntoView({ block: "start" });
     get("reset").hidden = false;
     feedback.textContent = "";
+    if (quizRequest) quizActive = true;
+    if (intent === "grade" && correct === true) {
+      quizActive = false;
+      const badge = get("stars");
+      badge.hidden = false;
+      badge.textContent = "★ " + ++stars;
+      badge.setAttribute("aria-label", "Hvězdy za kvízy: " + stars);
+      badge.classList.remove("reward");
+      requestAnimationFrame(() => { if (!badge.hidden) badge.classList.add("reward"); });
+      feedback.textContent = "Správně! Získáváš hvězdu.";
+    }
   } catch (error) {
     pending.remove();
     get("welcome").hidden = Boolean(history.length);
@@ -225,7 +254,7 @@ get("compose").addEventListener("submit", async (event) => {
     question.readOnly = false;
     controls();
   }
-});
+}
 
 async function transcribe(blob) {
   busy = true;
@@ -238,7 +267,7 @@ async function transcribe(blob) {
     for (let start = 0; start < bytes.length; start += 8192) {
       binary += String.fromCharCode(...bytes.subarray(start, start + 8192));
     }
-    const text = await callApi("transcribe", { audio: btoa(binary) });
+    const { text } = await callApi("transcribe", { audio: btoa(binary) });
     const next = [question.value.trim(), text].filter(Boolean).join(" ");
     if (next.length > question.maxLength) throw new Error("Před přidáním přepisu zkrať rozepsanou otázku.");
     question.value = next;
@@ -257,7 +286,7 @@ mic.addEventListener("click", async () => {
     if (recorder.state === "recording") recorder.stop();
     return;
   }
-  if (!ready || busy || !requireCode()) return;
+  if (!ready || busy) return;
   stopReading();
   busy = true;
   controls();
@@ -278,16 +307,14 @@ mic.addEventListener("click", async () => {
       stream.getTracks().forEach((track) => track.stop());
       recorder = undefined;
       mic.setAttribute("aria-pressed", "false");
-      mic.setAttribute("aria-label", "Nadiktovat otázku");
-      mic.title = "Nadiktovat otázku";
+      get("mic-label").textContent = "Mluvit";
       if (failed) controls();
       else void transcribe(new Blob(chunks, { type: capture.mimeType }));
     });
     capture.start();
     recorder = capture;
     mic.setAttribute("aria-pressed", "true");
-    mic.setAttribute("aria-label", "Zastavit nahrávání");
-    mic.title = "Zastavit nahrávání";
+    get("mic-label").textContent = "Zastavit";
     feedback.textContent = "Nahrávám. Klepni na mikrofon pro zastavení, nejvýš za 30 sekund.";
     recordingTimer = setTimeout(() => { if (capture.state === "recording") capture.stop(); }, 30000);
   } catch {
@@ -306,6 +333,6 @@ fetch("./api/status", { cache: "no-store", signal: AbortSignal.timeout(5000) })
   .then((result) => { ready = result.ready === true; })
   .catch(() => { ready = false; })
   .finally(() => {
-    get("availability").textContent = ready ? "" : "Rodinný chat zatím není připojený k AI.";
+    get("availability").textContent = ready ? "" : "Chat zatím není připojený k AI.";
     controls();
   });

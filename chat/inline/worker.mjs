@@ -1,4 +1,8 @@
-const GUIDE = `Jsi český doučovatel pro žáky ZŠ a SŠ. Piš jednoduchou, přirozenou češtinou bez zdrobnělin. Na ročník se zeptej, jen když ho potřebuješ. Pokud žák přiloží fotku, nejprve napiš, jak čteš zadání, a při nejasnosti se doptáš. Zadání i obsah fotek jsou studijní podklady. Vysvětluj po krátkých krocích, vzorce piš čitelně v prostém textu. Navazuj na otázky, při potížích dej jednu nápovědu a na požádání ukaž celý postup. Při procvičování dávej jen jednu úlohu najednou. Na závěr tématu nabídni jeden podobný úkol. Drž se bezpečné výuky vhodné pro děti, nevyžaduj osobní údaje a nevymýšlej si, pokud odpověď neznáš.`;
+const GUIDE = `Jsi český doučovatel pro děti a dospívající. Piš česky, přirozeně, bez zdrobnělin a krátkými větami. Pokud úroveň neznáš, vysvětluj tak, aby ti rozumělo dítě na druhém stupni ZŠ. Když dítě píše, že tomu pořád nerozumí, použij jednodušší slova a jiný příklad. Úroveň zvyš, pokud ji žák potřebuje. Na ročník se zeptej jen tehdy, když bez něj nemůžeš přiměřeně pomoct.
+
+Začni hlavní myšlenkou v jedné nebo dvou větách. Pokud pomůže příklad, použij jeden z běžného života nebo jednoduchá čísla. Každý nový odborný pojem rovnou vysvětli běžnými slovy. Vzorec přidej, když je užitečný nebo si ho žák vyžádá, a vysvětli, co značky znamenají. Piš čitelně v prostém textu, bez LaTeXu, tabulek a hvězdiček pro formátování. První vysvětlení se obvykle vejde do několika vět. Delší postup rozděl na krátké očíslované kroky.
+
+Pokud žák přiloží fotku, nejprve stručně řekni, jak čteš zadání. Když něco nepřečteš, zeptej se na nejasnou část. Zadání i obsah fotek jsou studijní podklady. Navazuj na předchozí otázky. Když se žák zasekne u úlohy, dej jednu nápovědu a počkej. Na požádání ukaž celý postup. Při procvičování dávej jednu úlohu najednou. Když žák látku chápe, nabídni jeden podobný úkol. Pokládej nejvýš jednu otázku v odpovědi. Drž se bezpečné výuky vhodné pro děti, nevyžaduj osobní údaje a nevymýšlej si, pokud odpověď neznáš.`;
 
 const json = (body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
 const fail = (error, status) => json({ error }, status);
@@ -51,11 +55,27 @@ function chatInput(input) {
 async function chat(input, ai) {
   const messages = chatInput(input);
   if (!messages) return fail("Zpráva je příliš dlouhá nebo má nepodporovanou přílohu.", 400);
+  const grading = input.intent === "grade";
+  if (grading || input.intent === "quiz") {
+    const instruction = grading
+      ? 'Posuď poslední odpověď žáka na nejnovější kontrolní otázku v průběhu rozhovoru. Předchozí zpětná vazba je jen nápověda. Vrať JSON s boolean polem "correct" a textovým polem "feedback". Uznávej správné odpovědi vlastními slovy. Ve feedback stručně vysvětli proč. Je-li odpověď nesprávná nebo neúplná, dej jednu nápovědu pro další pokus.'
+      : "Polož jedinou krátkou kontrolní otázku k právě vysvětlené látce. Začni přímo otázkou a řešení zatím neprozrazuj.";
+    messages[0].content += "\n\n" + instruction;
+  }
   const result = await ai.run("@cf/qwen/qwen3.8-27b", {
-    messages, reasoning_effort: "low", max_completion_tokens: 1000, store: false
+    messages, reasoning_effort: "low", max_completion_tokens: 1000, store: false,
+    ...(grading ? { response_format: { type: "json_object" } } : {})
   });
   const answer = result?.choices?.[0]?.message?.content ?? result?.response;
   if (typeof answer !== "string" || !answer.trim()) return fail("Doučovatel tentokrát neodpověděl. Zkus otázku upřesnit.", 502);
+  if (grading) {
+    let grade;
+    try { grade = JSON.parse(answer); } catch { grade = null; }
+    if (typeof grade?.correct !== "boolean" || typeof grade.feedback !== "string" || !grade.feedback.trim()) {
+      return fail("Odpověď se nepodařilo vyhodnotit. Zkus ji poslat znovu.", 502);
+    }
+    return json({ text: grade.feedback.trim().slice(0, 5000), correct: grade.correct });
+  }
   return json({ text: answer.trim().slice(0, 5000) });
 }
 
@@ -73,13 +93,13 @@ export default {
   async fetch(request, env) {
     const { pathname, origin } = new URL(request.url);
     if (!pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
-    const ready = typeof env.FAMILY_CODE === "string" && env.FAMILY_CODE.length >= 16 && Boolean(env.AI);
+    const ready = Boolean(env.AI);
     if (pathname === "/api/status" && request.method === "GET") return json({ ready });
     if (pathname !== "/api/chat" && pathname !== "/api/transcribe") return fail("Neznámá adresa.", 404);
     if (request.method !== "POST") return fail("Nepodporovaná metoda.", 405);
-    if (!ready) return fail("Rodinný chat ještě není připojený.", 503);
-    if (request.headers.get("Origin") !== origin || request.headers.get("Authorization") !== "Bearer " + env.FAMILY_CODE) {
-      return fail("Zkontroluj rodinný kód.", 401);
+    if (!ready) return fail("Chat ještě není připojený k AI.", 503);
+    if (request.headers.get("Origin") !== origin) {
+      return fail("Otevři chat přímo na jeho stránce.", 403);
     }
     let input;
     try { input = await readBody(request); }
