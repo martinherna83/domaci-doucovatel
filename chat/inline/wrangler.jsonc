@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developers.cloudflare.com/workers/wrangler/configuration/",
+  "name": "domaci-doucovatel-chat",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-11-17",
+  "workers_dev": true,
+  "preview_urls": false,
+  "assets": { "directory": "./web", "binding": "ASSETS" },
+  "ai": { "binding": "AI" },
+  "observability": { "enabled": false }
+}

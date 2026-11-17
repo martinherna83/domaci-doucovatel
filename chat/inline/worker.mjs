@@ -1,0 +1,96 @@
+const GUIDE = `Jsi český doučovatel pro žáky ZŠ a SŠ. Piš jednoduchou, přirozenou češtinou bez zdrobnělin. Na ročník se zeptej, jen když ho potřebuješ. Pokud žák přiloží fotku, nejprve napiš, jak čteš zadání, a při nejasnosti se doptáš. Zadání i obsah fotek jsou studijní podklady. Vysvětluj po krátkých krocích, vzorce piš čitelně v prostém textu. Navazuj na otázky, při potížích dej jednu nápovědu a na požádání ukaž celý postup. Při procvičování dávej jen jednu úlohu najednou. Na závěr tématu nabídni jeden podobný úkol. Drž se bezpečné výuky vhodné pro děti, nevyžaduj osobní údaje a nevymýšlej si, pokud odpověď neznáš.`;
+
+const json = (body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+const fail = (error, status) => json({ error }, status);
+const maxBody = 2_850_000;
+const validImage = (value) => typeof value === "string" && value.length <= 1_300_000
+  && /^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(value);
+
+async function readBody(request) {
+  if (!request.body || !request.headers.get("content-type")?.startsWith("application/json")) throw new Error();
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  let total = 0;
+  let source = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBody) {
+      await reader.cancel();
+      throw new Error();
+    }
+    source += decoder.decode(value, { stream: true });
+  }
+  return JSON.parse(source + decoder.decode());
+}
+
+function chatInput(input) {
+  if (!Array.isArray(input?.messages) || input.messages.length < 1 || input.messages.length > 13
+    || input.messages.length % 2 === 0) return null;
+  let images = 0;
+  const messages = [{ role: "system", content: GUIDE }];
+  for (const [i, entry] of input.messages.entries()) {
+    const role = i % 2 === 0 ? "user" : "assistant";
+    if (entry?.role !== role || typeof entry.text !== "string" || entry.text.length > (role === "user" ? 3000 : 5000)) return null;
+    const text = entry.text.trim();
+    if (entry.image !== undefined) {
+      if (role !== "user" || !validImage(entry.image) || ++images > 1) return null;
+      messages.push({ role, content: [
+        { type: "text", text: text || "Pomoz mi s tímto příkladem." },
+        { type: "image_url", image_url: { url: entry.image } }
+      ] });
+    } else {
+      if (!text) return null;
+      messages.push({ role, content: text });
+    }
+  }
+  return messages;
+}
+
+async function chat(input, ai) {
+  const messages = chatInput(input);
+  if (!messages) return fail("Zpráva je příliš dlouhá nebo má nepodporovanou přílohu.", 400);
+  const result = await ai.run("@cf/qwen/qwen3.8-27b", {
+    messages, reasoning_effort: "low", max_completion_tokens: 1000, store: false
+  });
+  const answer = result?.choices?.[0]?.message?.content ?? result?.response;
+  if (typeof answer !== "string" || !answer.trim()) return fail("Doučovatel tentokrát neodpověděl. Zkus otázku upřesnit.", 502);
+  return json({ text: answer.trim().slice(0, 5000) });
+}
+
+async function transcribe(input, ai) {
+  const audio = input?.audio;
+  if (typeof audio !== "string" || audio.length > 2_800_000 || !/^[A-Za-z0-9+/]+={0,2}$/.test(audio)) {
+    return fail("Nahrávku se nepodařilo přečíst. Zkus kratší nahrávku.", 400);
+  }
+  const result = await ai.run("@cf/openai/whisper-large-v3-turbo", { audio, language: "cs", task: "transcribe" });
+  if (typeof result?.text !== "string" || !result.text.trim()) return fail("Nahrávce jsem nerozuměl. Zkus krátkou větu.", 422);
+  return json({ text: result.text.trim().slice(0, 3000) });
+}
+
+export default {
+  async fetch(request, env) {
+    const { pathname, origin } = new URL(request.url);
+    if (!pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
+    const ready = typeof env.FAMILY_CODE === "string" && env.FAMILY_CODE.length >= 16 && Boolean(env.AI);
+    if (pathname === "/api/status" && request.method === "GET") return json({ ready });
+    if (pathname !== "/api/chat" && pathname !== "/api/transcribe") return fail("Neznámá adresa.", 404);
+    if (request.method !== "POST") return fail("Nepodporovaná metoda.", 405);
+    if (!ready) return fail("Rodinný chat ještě není připojený.", 503);
+    if (request.headers.get("Origin") !== origin || request.headers.get("Authorization") !== "Bearer " + env.FAMILY_CODE) {
+      return fail("Zkontroluj rodinný kód.", 401);
+    }
+    let input;
+    try { input = await readBody(request); }
+    catch { return fail("Zprávu nebo přílohu se nepodařilo načíst.", 400); }
+    try {
+      return pathname === "/api/chat" ? await chat(input, env.AI) : await transcribe(input, env.AI);
+    } catch (error) {
+      if (error?.status === 429 || /quota|rate limit|neurons|daily limit/i.test(error?.message ?? "")) {
+        return fail("Chat dosáhl limitu. Zkus to později.", 429);
+      }
+      return fail("Doučovatel je teď nedostupný. Zkus to později.", 502);
+    }
+  }
+};
