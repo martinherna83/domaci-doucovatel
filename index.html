@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#152d29">
+  <meta name="description" content="Připrav si zadání pro doučování, vyzkoušej školní výzvy a sleduj svůj pokrok.">
+  <title>Domácí doučovatel</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css">
+  <script src="./challenges.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <a class="skip button" href="#main">Přejít na obsah</a>
+  <header class="header">
+    <div class="wrap bar">
+      <a class="brand" href="#main"><img src="./favicon.svg" width="36" height="36" alt=""> Domácí doučovatel</a>
+      <nav aria-label="Hlavní navigace">
+        <a href="#doucovani">Doučování</a><a href="#vyzvy">Výzvy</a><a href="#pokrok">Pokrok</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="wrap">
+    <section class="hero" aria-labelledby="hero-title">
+      <div>
+        <span class="eyebrow">Učení pro ZŠ a SŠ</span>
+        <h1 id="hero-title">Co si dnes<br>probereme?</h1>
+        <p>Připrav si zadání pro Gemini nebo si rovnou zkus krátkou školní výzvu s nápovědou. Vlastním tempem a bez registrace na tomto webu.</p>
+        <a class="button hero-link" href="#vyzvy">Zkusit výzvu <span aria-hidden="true">↓</span></a>
+      </div>
+      <div class="illustration" aria-hidden="true">
+        <div class="paper"><i></i><i></i><i></i><span>✓</span></div>
+        <span class="spark">✦</span><span class="spark small">✦</span>
+      </div>
+    </section>
+
+    <section class="workspace" id="doucovani" aria-label="Doučování">
+      <form id="lesson" class="panel">
+        <p class="eyebrow">Doučování</p>
+        <h2>Vyber si téma</h2>
+        <label for="level">Ročník nebo úroveň <span class="optional">volitelné</span></label>
+        <select id="level" name="level">
+          <option value="">Bez výběru</option>
+          <optgroup label="Základní škola" id="primary-levels"></optgroup>
+          <optgroup label="Střední škola" id="secondary-levels"></optgroup>
+        </select>
+        <div class="fields">
+          <div>
+            <label for="subject">Předmět</label>
+            <input id="subject" name="subject" required maxlength="80" placeholder="Např. Matematika">
+          </div>
+          <div>
+            <label for="topic">Téma</label>
+            <input id="topic" name="topic" required maxlength="150" placeholder="Např. Zlomky">
+          </div>
+        </div>
+        <div class="examples" aria-label="Příklady předmětů">
+          <button type="button" data-subject="Matematika">Matematika</button>
+          <button type="button" data-subject="Čeština">Čeština</button>
+          <button type="button" data-subject="Angličtina">Angličtina</button>
+          <button type="button" data-subject="Fyzika">Fyzika</button>
+        </div>
+        <fieldset>
+          <legend>Co potřebuješ?</legend>
+          <div class="modes">
+            <label><input type="radio" name="mode" value="Vysvětlit látku" checked> Vysvětlit látku</label>
+            <label><input type="radio" name="mode" value="Pomoc s příkladem"> Pomoc s příkladem</label>
+            <label><input type="radio" name="mode" value="Procvičit"> Procvičit</label>
+            <label><input type="radio" name="mode" value="Příprava na test"> Příprava na test</label>
+          </div>
+        </fieldset>
+        <label for="context">Kde ses zasekl/a? <span class="optional">volitelné</span></label>
+        <textarea id="context" name="context" rows="2" maxlength="2000" placeholder="Napiš, co ti není jasné, nebo sem vlož příklad."></textarea>
+        <button class="primary" type="submit">Sestavit zadání <span aria-hidden="true">→</span></button>
+      </form>
+
+      <section class="panel preview" aria-labelledby="preview-title">
+        <p class="eyebrow">Gemini</p>
+        <h2 id="preview-title">Tvoje zadání</h2>
+        <label for="prompt" class="sr-only">Upravitelné zadání pro Gemini</label>
+        <textarea id="prompt" rows="9" placeholder="Po sestavení se tu zobrazí zadání. Před zkopírováním ho můžeš upravit." aria-describedby="copy-status"></textarea>
+        <div class="actions">
+          <button type="button" id="copy" disabled>Zkopírovat zadání</button>
+          <a class="button primary" href="https://gemini.google.com/" target="_blank" rel="noopener noreferrer">Otevřít Gemini <span aria-hidden="true">↗</span><span class="sr-only"> (nová karta)</span></a>
+        </div>
+        <p id="copy-status" class="status" role="status"></p>
+        <p class="muted">Zadání vlož do Gemini ručně. Gemini může vyžadovat přihlášení a jeho bezplatná verze má limity.</p>
+        <div class="howto">
+          <details><summary>Mám fotku</summary><p>Vlož zadání do Gemini. Fotku přidej přímo tam pomocí nabídky příloh a pak zprávu odešli.</p></details>
+          <details><summary>Chci mluvit</summary><p>V mobilní aplikaci Gemini otevři Live, pokud ho tvůj účet nabízí. Řekni svou úroveň, téma a s čím potřebuješ pomoct.</p></details>
+        </div>
+        <section id="lesson-result" class="result" hidden aria-labelledby="result-title">
+          <h3 id="result-title">Jak to šlo?</h3>
+          <p id="result-topic"></p>
+          <div class="actions">
+            <button type="button" id="needs-practice" aria-pressed="false">Ještě procvičit</button>
+            <button type="button" id="mastered" aria-pressed="false">Zvládám</button>
+            <button type="button" id="queue">Přidat k opakování</button>
+          </div>
+        </section>
+      </section>
+    </section>
+
+    <section id="vyzvy" class="section" aria-labelledby="challenge-title">
+      <div class="section-heading"><div><h2 id="challenge-title">Školní výzvy</h2><p>Vyzkoušej úlohu, odkryj si řešení a zaznamenej, co už máš za sebou.</p></div>
+        <div><label for="filter">Zobrazit výzvy</label><select id="filter"><option value="">Všechny úrovně</option><option>ZŠ</option><option>SŠ</option></select></div>
+      </div>
+      <div id="challenge-list" class="grid"></div>
+    </section>
+
+    <section id="pokrok" class="section progress" aria-labelledby="progress-title">
+      <div class="panel">
+        <h2 id="progress-title">Můj pokrok</h2>
+        <div class="stats">
+          <div><strong id="point-count">0</strong> Bodů</div>
+          <div><strong id="challenge-count">0</strong> Splněných výzev</div>
+          <div><strong id="review-count">0</strong> Hotových opakování</div>
+        </div>
+        <p class="muted">Za každou splněnou výzvu a každé označené opakování získáš bod.</p>
+        <h3>K opakování</h3>
+        <ul id="review-list" class="records"></ul>
+        <h3>Moje témata</h3>
+        <ul id="topic-list" class="records"></ul>
+      </div>
+      <div class="panel profiles">
+        <h2>Místní profily</h2>
+        <label for="profile">Aktivní profil</label>
+        <select id="profile"></select>
+        <form id="profile-form">
+          <label for="nickname">Přezdívka nového profilu</label>
+          <input id="nickname" required maxlength="24" placeholder="Např. Sova">
+          <button class="primary" type="submit">Přidat profil</button>
+        </form>
+        <p class="muted">Pokrok zůstává v tomto prohlížeči. Profily na sdíleném zařízení může přepnout kdokoli.</p>
+        <h3>Přenos pokroku</h3>
+        <p class="muted">Export obsahuje všechny profily. Platný import je nahradí obsahem vybraného souboru až po potvrzení.</p>
+        <button type="button" id="export">Stáhnout JSON</button>
+        <label for="import">Vybrat soubor JSON k importu</label>
+        <input type="file" id="import" accept=".json,application/json">
+        <p id="import-status" class="status" role="status"></p>
+      </div>
+    </section>
+    <p id="notice" class="notice" role="status"></p>
+  </main>
+
+  <footer><div class="wrap">Domácí doučovatel <span>•</span> Pokrok se ukládá v prohlížeči.</div></footer>
+</body>
+</html>
