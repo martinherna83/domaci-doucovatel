@@ -71,11 +71,6 @@ function setAttachment(value) {
   else get("preview").removeAttribute("src");
 }
 
-get("example").addEventListener("click", () => {
-  question.value = get("example").textContent;
-  question.focus();
-});
-
 get("reset").addEventListener("click", () => {
   history.length = 0;
   feed.replaceChildren();

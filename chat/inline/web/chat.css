@@ -9,7 +9,6 @@ h2 { margin: 0; font-size: clamp(1.65rem, 5vw, 2.65rem); letter-spacing: -.05em;
 p { margin: .5rem 0; }
 #conversation { min-height: 36vh; padding: clamp(.85rem, 4vw, 2rem); }
 .welcome { max-width: 30rem; margin: clamp(.6rem, 7vh, 4rem) auto 0; text-align: center; }
-.welcome button { margin-top: .35rem; }
 .message { margin-bottom: .85rem; max-width: 95%; padding: .75rem .95rem; border: 1px solid #ccd9ce; border-radius: 1rem; overflow-wrap: anywhere; }
 .message[data-role=user] { width: fit-content; margin-left: auto; border-bottom-right-radius: .25rem; background: #dcf1df; }
 .message[data-role=assistant] { border-top-left-radius: .25rem; background: white; }
