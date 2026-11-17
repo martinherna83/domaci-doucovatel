@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f4ed">
+  <meta name="description" content="Začni doučování v Gemini otázkou, fotkou nebo hlasem.">
+  <title>Doučovatel v chatu</title>
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css">
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="identity"><span class="chat-icon" aria-hidden="true"></span> Doučovatel v chatu</div>
+      <h1>S čím ti mám pomoct?</h1>
+      <p>Napiš otázku nebo přidej fotku příkladu. V Gemini spolu projdete, co ti není jasné, krok za krokem.</p>
+    </header>
+    <ul class="examples" aria-label="Příklady otázek">
+      <li>„Vysvětli mi zlomky“</li>
+      <li>„Nevím, jak začít tenhle příklad“</li>
+      <li>„Procvič se mnou angličtinu“</li>
+    </ul>
+    <section class="start" aria-label="Zahájení rozhovoru">
+      <button id="start" type="button" hidden>Zkopírovat pokyny a otevřít Gemini <span aria-hidden="true">↗</span></button>
+      <p id="status" role="status"></p>
+      <p class="tip">V novém chatu Gemini vlož pokyny, připiš otázku nebo přidej fotku a zprávu odešli.</p>
+      <div class="extras">
+        <a class="text-link" id="gemini" href="https://gemini.google.com/" rel="noreferrer">Otevřít Gemini <span aria-hidden="true">↗</span></a>
+        <details id="manual">
+          <summary>Pokyny k ručnímu zkopírování</summary>
+          <label for="instructions">Označ a zkopíruj celý text.</label>
+          <textarea id="instructions" readonly rows="7">Jsi český doučovatel pro žáky ZŠ a SŠ. Piš nebo mluv jednoduchou, přirozenou češtinou, bez zdrobnělin. Začni tím, s čím žák potřebuje pomoct. Na ročník se zeptej jen tehdy, když ti pomůže zvolit správnou obtížnost. Když žák pošle fotku, nejdřív krátce řekni, jak jsi přečetl zadání, a na nejasná místa se zeptej. Vysvětluj po krátkých krocích. Když se žák zasekne, dej jednu nápovědu a počkej na odpověď. Na požádání ukaž celý postup. Při procvičování dávej jednu úlohu najednou a navazuj na odpovědi. Nakonec nabídni jeden podobný úkol.</textarea>
+        </details>
+      </div>
+    </section>
+    <div class="options">
+      <details>
+        <summary>Mám fotku</summary>
+        <p>V chatu Gemini klepni vedle zprávy na nabídku příloh. Vyfoť příklad nebo vyber fotku z galerie a odešli ji s pokyny.</p>
+      </details>
+      <details>
+        <summary>Chci mluvit</summary>
+        <p>Otevři mobilní aplikaci Gemini a klepni na <strong>Live</strong>, pokud ho tvůj účet nabízí. Řekni: „Doučuj mě česky, jednoduše a po jednom kroku.“ Pak popiš, s čím potřebuješ pomoct.</p>
+      </details>
+    </div>
+    <footer>
+      <p>Bezplatné Gemini má limity. Přístup k fotkám a hlasu závisí na účtu a zařízení.</p>
+      <a class="text-link" href="../#vyzvy">Zkusit výzvy bez Gemini</a>
+    </footer>
+  </main>
+</body>
+</html>
