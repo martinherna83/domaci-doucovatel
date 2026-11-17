@@ -78,13 +78,53 @@ function controls() {
   question.placeholder = quizActive ? "Napiš odpověď na kvíz…" : "Napiš otázku…";
 }
 
-async function callApi(endpoint, payload) {
+async function callApi(endpoint, payload, onText) {
   const response = await fetch("./api/" + endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(60000)
   });
+  if (response.ok && response.headers.get("Content-Type")?.includes("text/event-stream")) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let text = "";
+    let complete = false;
+    function consume(event) {
+      const data = event.split("\n").filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trimStart()).join("\n");
+      if (!data) return;
+      if (data.trim() === "[DONE]") { complete = true; return; }
+      const chunk = JSON.parse(data);
+      if (chunk.error) throw new Error("Odpověď se přerušila. Zkus otázku znovu.");
+      const choice = chunk.choices?.[0];
+      if (choice?.finish_reason) complete = true;
+      const part = choice?.delta?.content ?? chunk.response;
+      if (typeof part === "string") {
+        text += part;
+        onText?.(text);
+      }
+    }
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
+        buffer = buffer.replace(/\r\n/g, "\n");
+        let boundary;
+        while ((boundary = buffer.indexOf("\n\n")) !== -1) {
+          consume(buffer.slice(0, boundary));
+          buffer = buffer.slice(boundary + 2);
+        }
+        if (done) break;
+      }
+      if (buffer.trim()) consume(buffer);
+      if (!complete || !text.trim()) throw new Error("Odpověď se přerušila. Zkus otázku znovu.");
+      return { text: text.trim() };
+    } finally {
+      await reader.cancel().catch(() => {});
+      reader.releaseLock();
+    }
+  }
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || "Spojení se nepodařilo.");
   return result;
@@ -216,11 +256,20 @@ async function sendMessage(intent) {
   controls();
   get("welcome").hidden = true;
   const pending = showMessage("user", [entry.text, entry.image ? "Přiložená fotka" : ""].filter(Boolean).join("\n"));
-  pending.scrollIntoView({ block: "start" });
-  feedback.textContent = "Doučovatel připravuje odpověď…";
+  const waiting = document.createElement("p");
+  waiting.className = "message waiting";
+  waiting.setAttribute("role", "status");
+  waiting.textContent = "Doučovatel připravuje odpověď…";
+  feed.append(waiting);
+  waiting.scrollIntoView({ block: "center" });
+  feedback.textContent = "";
 
   try {
-    const { text, correct } = await callApi("chat", { messages, intent });
+    const { text, correct } = await callApi("chat", { messages, intent, stream: intent !== "grade" }, (text) => {
+      waiting.classList.remove("waiting");
+      waiting.classList.add("streaming");
+      waiting.textContent = text;
+    });
     history.push(entry, { role: "assistant", text });
     history.splice(0, Math.max(0, history.length - 12));
     for (const message of history) {
@@ -231,6 +280,7 @@ async function sendMessage(intent) {
     }
     question.value = "";
     setAttachment("");
+    waiting.remove();
     showMessage("assistant", text).scrollIntoView({ block: "start" });
     get("reset").hidden = false;
     feedback.textContent = "";
@@ -250,6 +300,7 @@ async function sendMessage(intent) {
     get("welcome").hidden = Boolean(history.length);
     showError(error);
   } finally {
+    waiting.remove();
     busy = false;
     question.readOnly = false;
     controls();

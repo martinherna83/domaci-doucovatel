@@ -28,3 +28,5 @@ Gemini API se pro tuto variantu nepoužívá. Aktuální podmínky Google vyluč
 Místní testy používají kontrolovanou náhradu odpovědí Workers AI. Pro živé ověření po nasazení otestuj vstup bez přihlášení, návaznost dotazů, odpověď na fotku a český přepis z mikrofonu. Zvlášť zkus Safari na iPhonu nebo iPadu a Chrome na Androidu, protože nabídka focení, oprávnění mikrofonu a formáty nahrávek závisejí na zařízení.
 
 Na nasazeném Workeru prošlo ověření české odpovědi, navazující otázky a příkladu z testovací fotky v mobilním rozložení Edge. Přepis na serveru prošel se syntetickou anglickou nahrávkou. Český hlas z mikrofonu telefonu zbývá ověřit.
+
+Odpovědi na otázky a kvízové otázky se zobrazují průběžně. Vyhodnocení kvízu přijde jako celek. Stav čekání je přímo v konverzaci. Při přerušeném spojení se rozepsaná otázka zachová pro nový pokus.

@@ -64,8 +64,16 @@ async function chat(input, ai) {
   }
   const result = await ai.run("@cf/qwen/qwen3.8-27b", {
     messages, reasoning_effort: "low", max_completion_tokens: 1000, store: false,
+    ...(!grading && input.stream === true ? { stream: true } : {}),
     ...(grading ? { response_format: { type: "json_object" } } : {})
   });
+  if (!grading && input.stream === true) {
+    return new Response(result, { headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff"
+    } });
+  }
   const answer = result?.choices?.[0]?.message?.content ?? result?.response;
   if (typeof answer !== "string" || !answer.trim()) return fail("Doučovatel tentokrát neodpověděl. Zkus otázku upřesnit.", 502);
   if (grading) {

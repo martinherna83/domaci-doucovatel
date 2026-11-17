@@ -22,6 +22,8 @@ p { margin: .5rem 0; }
 .message[data-role=assistant] { border-top-left-radius: .25rem; background: white; }
 .message strong { font-size: .875rem; }
 .message p { white-space: pre-wrap; margin: .2rem 0 0; }
+.waiting { width: fit-content; background: #e6eee1; color: #215d4d; font-weight: 650; }
+.streaming { white-space: pre-wrap; }
 .read-answer { margin-top: .65rem; font-size: .9rem; }
 .reading-status { color: #4b6259; font-size: .85rem; }
 .reading-status:empty { display: none; }
