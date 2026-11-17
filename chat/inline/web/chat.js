@@ -13,6 +13,55 @@ let busy = false;
 let ready = false;
 let recorder;
 let recordingTimer;
+let reading;
+
+function stopReading() {
+  if (!reading) return;
+  const { button } = reading;
+  reading = undefined;
+  button.textContent = "Přečíst nahlas";
+  speechSynthesis.cancel();
+}
+
+function readAnswer(text, button, status) {
+  const stopping = reading?.button === button;
+  stopReading();
+  status.textContent = "";
+  if (stopping) return;
+
+  const voice = speechSynthesis.getVoices().find((item) =>
+    item.localService && /^cs(?:[-_]|$)/i.test(item.lang));
+  if (!voice) {
+    status.textContent = "Český hlas není dostupný. Můžeš ho přidat v nastavení předčítání zařízení, pokud ho zařízení nabízí.";
+    return;
+  }
+
+  const parts = text.match(/\S[\s\S]{0,179}(?=\s|$)|\S{1,180}/g) ?? [];
+  const playback = { button, utterance: null };
+  reading = playback;
+  button.textContent = "Zastavit čtení";
+  let index = 0;
+  function next() {
+    if (reading !== playback) return;
+    if (index === parts.length) {
+      stopReading();
+      return;
+    }
+    const utterance = new SpeechSynthesisUtterance(parts[index++]);
+    utterance.voice = voice;
+    utterance.lang = voice.lang;
+    utterance.rate = .9;
+    playback.utterance = utterance;
+    utterance.onend = next;
+    utterance.onerror = () => {
+      if (reading !== playback) return;
+      stopReading();
+      status.textContent = "Odpověď se nepodařilo přehrát.";
+    };
+    speechSynthesis.speak(utterance);
+  }
+  next();
+}
 
 function controls() {
   get("send").disabled = !ready || busy || Boolean(recorder);
@@ -60,6 +109,17 @@ function showMessage(role, text) {
   const body = document.createElement("p");
   body.textContent = text;
   message.append(name, body);
+  if (role === "assistant" && "speechSynthesis" in window && "SpeechSynthesisUtterance" in window) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "read-answer";
+    button.textContent = "Přečíst nahlas";
+    const status = document.createElement("p");
+    status.className = "reading-status";
+    status.setAttribute("role", "status");
+    button.addEventListener("click", () => readAnswer(text, button, status));
+    message.append(button, status);
+  }
   feed.append(message);
   return message;
 }
@@ -72,6 +132,7 @@ function setAttachment(value) {
 }
 
 get("reset").addEventListener("click", () => {
+  stopReading();
   history.length = 0;
   feed.replaceChildren();
   question.value = "";
@@ -197,6 +258,7 @@ mic.addEventListener("click", async () => {
     return;
   }
   if (!ready || busy || !requireCode()) return;
+  stopReading();
   busy = true;
   controls();
   let stream;

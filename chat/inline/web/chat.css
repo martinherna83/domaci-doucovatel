@@ -14,6 +14,9 @@ p { margin: .5rem 0; }
 .message[data-role=assistant] { border-top-left-radius: .25rem; background: white; }
 .message strong { font-size: .875rem; }
 .message p { white-space: pre-wrap; margin: .2rem 0 0; }
+.read-answer { margin-top: .65rem; font-size: .9rem; }
+.reading-status { color: #4b6259; font-size: .85rem; }
+.reading-status:empty { display: none; }
 #compose { position: sticky; bottom: 0; background: #fcfdfb; border-top: 1px solid #cbd8ce; padding: .6rem 1rem calc(.6rem + env(safe-area-inset-bottom)); }
 textarea, input[type=password] { display: block; width: 100%; border: 1px solid #879e91; border-radius: .7rem; color: inherit; background: white; font: inherit; padding: .55rem; min-height: 44px; }
 textarea { resize: vertical; max-height: 35vh; }
